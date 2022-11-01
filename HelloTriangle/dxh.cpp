@@ -1,23 +1,143 @@
+#include "pch.h"
 #include "dxh.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb-master\stb_image.h"
+
+
 
 DXHandler::DXHandler(HWND handle)
 {
-	if (InitializeSwapChainAndDevice(handle, swapchain, device, context) == false){
+	if (!SetupDirectX(handle))
+	{
+		util::ErrorMessageBox("Failed to set up DirectX.");
 		exit(-1);
 	}
-	if (CreateRenderTargetView(device, swapchain, rendertargetview) == false)
+	if (!SetupPipeline(handle))
 	{
+		util::ErrorMessageBox("Failed to set up pipeline.");
 		exit(-2);
 	}
-	if (CompileShaders(device, vertexshader, pixelshader) == false){
-		exit(-3);
+
+	flagged = false;
+}
+
+DXHandler::~DXHandler()
+{
+	device->Release();
+	context->Release();
+	swapchain->Release();
+	rendertargetview->Release();
+	dsTexture->Release();
+	dsv->Release();
+	dsState->Release();
+	vertexshader->Release();
+	pixelshader->Release();
+	inputlayout->Release();
+	bMatrix->Release();
+	//bMaterial;
+	//bLighting;
+	bVertex->Release();
+	bIndex->Release();
+}
+
+bool DXHandler::SetupDirectX(HWND handle)
+{
+	if (!CreateDeviceAndSwapChain(handle, swapchain, device, context)) {
+		return false;
 	}
-	if (CreateMesh(device, vertexbuffer, indexbuffer) == false)
+	if (!CreateRenderTargetView(device, swapchain, rendertargetview))
 	{
-		exit(-4);
+		return false;
 	}
 	
+	RECT rc{};
+	GetClientRect(handle, &rc);
+	//Sets initial viewport to be the same as the handle client area
+	SetViewport(this->context, FLOAT(rc.right - rc.left), FLOAT(rc.bottom - rc.top), 0, 0, 1, 0);
+
+	return true;
 }
+
+bool DXHandler::SetupPipeline(HWND handle)
+{
+	//Get window client area for later
+	RECT rc{};
+	GetClientRect(handle, &rc);
+
+	if (!CreateShaders(device, context, vertexshader, pixelshader, inputlayout)) {
+		util::ErrorMessageBox("Failed to compile shaders.");
+		return false;
+	}
+
+	if (!CreateMesh(device, context, bVertex, bIndex))
+	{
+		util::ErrorMessageBox("Failed to create mesh.");
+		return false;
+	}
+
+	if (!SetupMatrix(device, context, bMatrix, wvp))
+	{
+		util::ErrorMessageBox("Could not set up wvp matrix.");
+		return false;
+	}
+
+	if (!CreateVertexBuffer(device, context, bVertex, mesh))
+	{
+		util::ErrorMessageBox("Failed to set up Vertex Buffer");
+		return false;
+	}
+	if (!CreateIndexBuffer(device, context, bIndex, mesh))
+	{
+		util::ErrorMessageBox("Failed to set up Index Buffer");
+		return false;
+	}
+
+	if (!CreateRasterizerState(device, context, rasterizerstate))
+	{
+		util::ErrorMessageBox("Failed to create rasterizer state.");
+		return false;
+	}
+
+	//Set up Texture
+	//Depth Stencil
+	if (!CreateDepthStencil(device, rc.right - rc.left, rc.bottom - rc.top, dsTexture, dsv, dsState))
+	{
+		util::ErrorMessageBox("Failed to create Depth Stencil");
+		return false;
+	}
+
+	if (!CreateConstantBuffer(device, context, bMatrix)) 
+	{
+		util::ErrorMessageBox("Failed to create matrix constant buffer!");
+		return false;
+	}
+
+	if (!CreateTexture(device, context, gTexture, gTextureView))
+	{
+		util::ErrorMessageBox("Failed to create texture or resource view!");
+		return false;
+	}
+	if (!CreateSamplerState(device, context, gSamplerState))
+	{
+		util::ErrorMessageBox("Failed to create sampler state!");
+		return false;
+	}
+
+	SetTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//Set up wvp matrix const buffer
+
+	//Set up lighting const buffer
+
+	//Set up material const buffer
+
+
+	return true;
+}
+
+// **********************************************************************************************************
+// INTERNAL/HELPER FUNCTIONS
+// **********************************************************************************************************
 
 std::string DXHandler::ReadShaderData(std::string filepath){
 	
@@ -34,10 +154,13 @@ std::string DXHandler::ReadShaderData(std::string filepath){
 	fstr.seekg(0, std::ios::beg);
 
 	data.assign((std::istreambuf_iterator<char>(fstr)), std::istreambuf_iterator<char>());
+	
 	return data;
 }
 
-bool DXHandler::InitializeSwapChainAndDevice(HWND handle, IDXGISwapChain*& swapchain, ID3D11Device*& device, ID3D11DeviceContext * &context)
+
+
+bool DXHandler::CreateDeviceAndSwapChain(HWND handle, IDXGISwapChain*& swapchain, ID3D11Device*& device, ID3D11DeviceContext * &context)
 {
 	DXGI_SWAP_CHAIN_DESC scd{ 0 };
 	RECT rc{};
@@ -61,7 +184,7 @@ bool DXHandler::InitializeSwapChainAndDevice(HWND handle, IDXGISwapChain*& swapc
 		NULL,
 		D3D_DRIVER_TYPE_HARDWARE,
 		NULL,
-		NULL,
+		D3D11_CREATE_DEVICE_DEBUG,
 		NULL,
 		NULL,
 		D3D11_SDK_VERSION,
@@ -78,6 +201,11 @@ bool DXHandler::InitializeSwapChainAndDevice(HWND handle, IDXGISwapChain*& swapc
 	}
 
 	return true;
+}
+
+void DXHandler::SetTopology(ID3D11DeviceContext*& context, D3D11_PRIMITIVE_TOPOLOGY topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP) 
+{
+	context->IASetPrimitiveTopology(topology);
 }
 
 bool DXHandler::CreateRenderTargetView(ID3D11Device*& device, IDXGISwapChain*& swapchain, ID3D11RenderTargetView*& rtv)
@@ -97,10 +225,12 @@ bool DXHandler::CreateRenderTargetView(ID3D11Device*& device, IDXGISwapChain*& s
 		util::ErrorMessageBox("Failed to create Render Target View");
 		return false;
 	}
+	context->OMSetRenderTargets(1, &rtv, NULL);
 
 	return true;
 }
-bool DXHandler::CreateVertexShader(ID3D11Device*& device, ID3D11VertexShader*& vshader, std::string filepath)
+
+bool DXHandler::CreateVertexShader(ID3D11Device*& device, ID3D11DeviceContext *&context, ID3D11VertexShader*& vshader, ID3D11InputLayout *& inputLayout, std::string filepath)
 {
 	std::string data = ReadShaderData(filepath);
 
@@ -109,6 +239,9 @@ bool DXHandler::CreateVertexShader(ID3D11Device*& device, ID3D11VertexShader*& v
 		util::ErrorMessageBox("Could not create vertex shader. Last error: " + LASTERR);
 		return false;
 	}
+	context->VSSetShader(vshader, nullptr, 0);
+
+	CreateInputLayout(device, context, inputLayout, data);
 
 	return true;
 }
@@ -121,132 +254,359 @@ bool DXHandler::CreatePixelShader(ID3D11Device*& device, ID3D11PixelShader*& psh
 		util::ErrorMessageBox("Could not create pixel shader. Last error: " + LASTERR);
 		return false;
 	}
+	context->PSSetShader(pshader, nullptr, 0);
+
 	return true;
 }
 
-bool DXHandler::CompileShaders(ID3D11Device *& device, ID3D11VertexShader *& vertexshader, ID3D11PixelShader *& pixelshader) 
+bool DXHandler::CreateShaders(ID3D11Device *& device, ID3D11DeviceContext *& context, ID3D11VertexShader *& vertexshader, ID3D11PixelShader *& pixelshader, ID3D11InputLayout *& inputLayout) 
 {
-	//vertex shader
-	if (!CreateVertexShader(device, vertexshader, "D:/repos/HelloTriangle/Debug/VertexShader.cso"))
+	if (!CreateVertexShader(device, context, vertexshader, inputLayout, "D:/repos/HelloTriangle/Debug/VertexShader.cso"))
 		return false;
-	//pixel shader
 	if (!CreatePixelShader(device, pixelshader, "D:/repos/HelloTriangle/Debug/PixelShader.cso"))
 		return false;
+	return true;
+}
+
+bool DXHandler::CreateRasterizerState(ID3D11Device *& device, ID3D11DeviceContext *& context, ID3D11RasterizerState*& ppRasterizerState) 
+{
+	D3D11_RASTERIZER_DESC rzd{};
+	rzd.FillMode = D3D11_FILL_SOLID;
+	rzd.CullMode = D3D11_CULL_BACK;
+	rzd.FrontCounterClockwise = false;
+	rzd.MultisampleEnable = true;
+	rzd.AntialiasedLineEnable = true;
+	rzd.ScissorEnable = false;
+	rzd.DepthClipEnable = false;
+
+	HRESULT hr = device->CreateRasterizerState(&rzd, &ppRasterizerState);
+	if (FAILED(hr))
+	{
+		util::ErrorMessageBox("Could not create rasterizer state. Last error: " + LASTERR);
+		return false;
+	}
+	context->RSSetState(ppRasterizerState);
+	return true;
+}
+
+
+
+bool DXHandler::SetupMatrix(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, dxh::WVP &wvp)
+{
+	DirectX::XMMATRIX world{}, view{}, projection{};
+
+	wvp.world = DirectX::XMMatrixIdentity();
+	wvp.view = DirectX::XMMatrixTranspose(DirectX::XMMatrixLookAtRH({ 0, 0, -5 }, {0, 0, 0}, {0, 1, 0}));
+	wvp.project = DirectX::XMMatrixPerspectiveFovLH(3.1415f*0.70f, 800/600.0f, 0.1f, 1.0f);
+
+	if (!CreateConstantBuffer(device, context, cBuffer))
+	{
+		return false;
+	}
+	
+	return true;
+};
+
+
+bool DXHandler::CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, const D3D11_SUBRESOURCE_DATA * srd)
+{
+	D3D11_BUFFER_DESC bd{};
+	bd.Usage = D3D11_USAGE_DYNAMIC;
+	bd.ByteWidth = sizeof(dxh::WVP);
+	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.MiscFlags = 0;
+	bd.StructureByteStride = 0;
+
+	HRESULT hr = device->CreateBuffer(&bd, NULL, &cBuffer);
+	if (FAILED(hr))
+	{
+		util::ErrorMessageBox("Failed to create constant buffer! Last error " + LASTERR);
+		return false;
+	}
+
+	context->VSSetConstantBuffers(0, 1, &cBuffer);
 
 	return true;
 }
 
-bool CreateDepthStencil(ID3D11Device*& device, UINT width, UINT height, ID3D11Texture2D *& dsTexture, ID3D11DepthStencilView*& dsv) 
-{
-	D3D11_TEXTURE2D_DESC texdesc{};
-	texdesc.Width = width;
-	texdesc.Height = height;
-	texdesc.MipLevels = 1;
-	texdesc.ArraySize = 1;
-	texdesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	texdesc.SampleDesc.Count = 1;
-	texdesc.SampleDesc.Quality = 0;
-	texdesc.Usage = D3D11_USAGE_DEFAULT;
-	texdesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-	texdesc.CPUAccessFlags = 0;
-	texdesc.MiscFlags = 0;
 
-	HRESULT hr = device->CreateTexture2D(&texdesc, NULL, &dsTexture);
+
+bool DXHandler::CreateDepthStencil(ID3D11Device*& device, UINT width, UINT height, ID3D11Texture2D *& texture, ID3D11DepthStencilView*& dsview, ID3D11DepthStencilState *& dsstate) 
+{
+	D3D11_TEXTURE2D_DESC dstexdesc{};
+	dstexdesc.Width = width;
+	dstexdesc.Height = height;
+	dstexdesc.MipLevels = 1;
+	dstexdesc.ArraySize = 1;
+	dstexdesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dstexdesc.SampleDesc.Count = 1;
+	dstexdesc.SampleDesc.Quality = 0;
+	dstexdesc.Usage = D3D11_USAGE_DEFAULT;
+	dstexdesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	dstexdesc.CPUAccessFlags = 0;
+	dstexdesc.MiscFlags = 0;
+
+	HRESULT hr = device->CreateTexture2D(&dstexdesc, NULL, &texture);
 	if (FAILED(hr))
 	{
 		util::ErrorMessageBox("Failed to create 2D texture for depth stencil. Last error: " + LASTERR);
 		return false;
 	}	
-	hr = device->CreateDepthStencilView(dsTexture, NULL, &dsv);
+	hr = device->CreateDepthStencilView(texture, NULL, &dsview);
 	if(FAILED(hr))
 	{
 		util::ErrorMessageBox("Failed to create Depth Stencil View. Last error: " + LASTERR);
 		return false;
 	}
 
+	D3D11_DEPTH_STENCIL_DESC dsDesc{};
+	// Depth test parameters
+	dsDesc.DepthEnable		= true;
+	dsDesc.DepthWriteMask	= D3D11_DEPTH_WRITE_MASK_ALL;
+	dsDesc.DepthFunc		= D3D11_COMPARISON_LESS;
+	// Stencil test parameters
+	dsDesc.StencilEnable	= true;
+	dsDesc.StencilReadMask	= 0xFF;
+	dsDesc.StencilWriteMask = 0xFF;
+	// Stencil operations if pixel is front-facing
+	dsDesc.FrontFace.StencilFailOp		= D3D11_STENCIL_OP_KEEP;
+	dsDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+	dsDesc.FrontFace.StencilPassOp		= D3D11_STENCIL_OP_KEEP;
+	dsDesc.FrontFace.StencilFunc		= D3D11_COMPARISON_ALWAYS;
+	// Stencil operations if pixel is back-facing
+	dsDesc.BackFace.StencilFailOp		= D3D11_STENCIL_OP_KEEP;
+	dsDesc.BackFace.StencilDepthFailOp	= D3D11_STENCIL_OP_DECR;
+	dsDesc.BackFace.StencilPassOp		= D3D11_STENCIL_OP_KEEP;
+	dsDesc.BackFace.StencilFunc			= D3D11_COMPARISON_ALWAYS;
+	
+	hr = device->CreateDepthStencilState(&dsDesc, &dsstate);
+	if (FAILED(hr))
+	{
+		util::ErrorMessageBox("Failed to create Depth Stencil State. Lasterror: " + LASTERR);
+		return false;
+	}
+	context->OMSetDepthStencilState(dsstate, 0);
+
 	return true;
 
 }
 
-bool DXHandler::CreateMesh(ID3D11Device*& device, ID3D11Buffer*& vertexbuffer, ID3D11Buffer *&indexbuffer) {
+bool DXHandler::CreateTexture(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview)
+{
+	//GenerateTexture();
+	LoadTextureFromFile(device, context, texture, shaderresourceview, "smiley.png");
 
-	dxh::float3 positions[]
+
+	D3D11_TEXTURE2D_DESC texDesc{ 0 };
+	texDesc.Width = cTex.width; //How wide is the image (in texels [texture pixels])
+	texDesc.Height = cTex.height; //How tall is the image (texels)
+	texDesc.MipLevels = texDesc.ArraySize = 1; //
+	texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; //32 bit color 
+	texDesc.SampleDesc.Count = 1; //
+	texDesc.SampleDesc.Quality = 0; //
+	texDesc.Usage = D3D11_USAGE_IMMUTABLE; //Will read from and write to GPU, no CPU required
+	texDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE; //
+	texDesc.MiscFlags = 0; //
+	texDesc.CPUAccessFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA texData{};
+	texData.pSysMem = &cTex.data[0];
+	texData.SysMemPitch = cTex.width*cTex.channels;
+	texData.SysMemSlicePitch = 0;
+
+	HRESULT hr = device->CreateTexture2D(&texDesc, &texData, &texture);
+	if (FAILED(hr))
 	{
-		{-0.5, -0.5f, 0.0f},
-		{0.5f, -0.5f, 0.0f},
-		{0.5f, -0.5f, 0.0f},
-		{0.5f, -0.5f, 0.0f}
-	};
-
-	dxh::float3 normal = dxh::cross(positions[0] - positions[1], positions[0] - positions[2]);
-	dxh::float2 uv[]
-	{ {0,0}, {1, 0}, {0, 1}, {1, 1}
-
-	};
-
-	size_t indices[]
-	{	0, 1, 2,
-		0, 2, 3
-	};
-	
-	dxh::Mesh quad;
-
-	for(int i = 0; i < 6; i++)
-		quad.indices.push_back(indices[i]);
-	for (int i = 0; i < 4; i++)
-	{
-		quad.vertices.push_back(dxh::Vertex(positions[i], normal, uv[i]));
+		util::ErrorMessageBox("failed to create 2d texture. last err: " + LASTERR);
+		return false;
 	}
 
-	if (SetupVertexBuffer(device, vertexbuffer, quad) == false)
+	D3D11_SHADER_RESOURCE_VIEW_DESC resViewDesc;
+	ZeroMemory(&resViewDesc, sizeof(resViewDesc));
+	resViewDesc.Format = texDesc.Format;
+	resViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	resViewDesc.Texture2D.MipLevels = texDesc.MipLevels;
+	resViewDesc.Texture2D.MostDetailedMip = 0;
+
+	hr = device->CreateShaderResourceView(texture, &resViewDesc, &shaderresourceview);
+	if (FAILED(hr))
 	{
 		return false;
 	}
 
-	if (SetupIndexBuffer(device, indexbuffer, quad) == false)
+	context->PSSetShaderResources(0, 1, &shaderresourceview);
+	return true;
+}
+
+bool DXHandler::CreateSamplerState(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11SamplerState*& samplerstate)
+{
+	//Sampler description
+	D3D11_SAMPLER_DESC samplerDesc{};
+	ZeroMemory(&samplerDesc, sizeof(samplerDesc));
+	samplerDesc.Filter = D3D11_FILTER_ANISOTROPIC;
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerDesc.MipLODBias = 0;
+	samplerDesc.MaxAnisotropy = 16;
+	samplerDesc.BorderColor[0] = samplerDesc.BorderColor[1] = samplerDesc.BorderColor[2] = samplerDesc.BorderColor[3] = 0;
+	samplerDesc.MinLOD = 0;
+	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	//Create Sampler
+	HRESULT hr = device->CreateSamplerState(&samplerDesc, &samplerstate);
+
+	if (FAILED(hr))
 	{
-		util::ErrorMessageBox("Could not create index buffer.");
+		return false;
+	}
+ 
+	context->PSSetSamplers(0, 1, &samplerstate);
+	return true;
+}
+
+
+//Loads an image from a file using the stb_image library and converts it to a usable texture
+bool DXHandler::LoadTextureFromFile(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview, const std::string filepath) 
+{
+	int width, height, channels;
+	
+	unsigned char* img = stbi_load(filepath.c_str(), &width, &height, &channels, 0);
+	if (img == NULL)
+	{
+		util::ErrorMessageBox("could not load image from file \"" + filepath + "\".");
+		return false;
+	}
+	//should be total of the image
+	int n = width * height * channels;
+	std::vector<unsigned char> _img(img, img+n);
+
+	cTex.channels = channels;
+	cTex.height = height;
+	cTex.width = width;
+	cTex.data = _img;
+
+
+	//free the data
+	stbi_image_free(img);
+
+	return true;
+}
+
+//*********************************************************
+//MESH
+//*********************************************************
+
+bool DXHandler::CreateMesh(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& bVertex, ID3D11Buffer *&bIndex) {
+
+	dxh::float3 positions[]
+	{
+		{-0.5, -0.5f, 0.0f}, // top left                  +------+
+		{0.5f, -0.5f, 0.0f}, // top right				  |		 |
+		{-0.5f, 0.5f, 0.0f}, // bottom left				  |		 |
+		{0.5f, 0.5f, 0.0f}   // bottom right			  +------+
+	};
+	//testing cause ít got fuck't
+	//dxh::float3 positions[]
+	//{
+	//	{0.0f, 0.0f, 0.0f}, // top left
+	//	{1.0f, 0.0f, 0.0f}, // top right
+	//	{1.0f, 1.0f, 0.0f},  // bottom right
+	//	{0.0f, 1.0f, 0.0f}  // bottom left
+	//};
+
+
+	dxh::float3 pos[4];
+	
+	dxh::float3 normal = dxh::cross(positions[0] - positions[1], positions[0] - positions[2]);
+	
+	dxh::float2 uv[]
+	{ 
+		{1, 1}, // top left uv
+		{0, 1}, // top right uv
+		{1, 0}, // bottom left uv
+		{0, 0}  // bottom right uv
+	};
+
+	size_t indices[]
+	{	
+		0, 1, 3, //first triangle
+		0, 3, 2  //second triangle
+	};
+	
+
+	for (int i = 0; i < 6; i++)
+	{
+		this->mesh.indices.push_back(indices[i]);
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		this->mesh.vertices.push_back(dxh::Vertex(positions[i], normal, uv[i]));
 	}
 
 	return true;
  }
 
-bool DXHandler::SetupVertexBuffer(ID3D11Device*& device, ID3D11Buffer*& vbuffer, const dxh::Mesh& mesh)
+bool DXHandler::CreateVertexBuffer(ID3D11Device*& device, ID3D11DeviceContext *&context, ID3D11Buffer*& vbuffer, const dxh::Mesh& mesh)
 {
 	D3D11_BUFFER_DESC buffdesc{ 0 };
-	buffdesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	buffdesc.Usage = D3D11_USAGE_DYNAMIC;
-	buffdesc.ByteWidth = mesh.ByteWidth();
+	buffdesc.BindFlags		= D3D11_BIND_VERTEX_BUFFER;
+	buffdesc.Usage			= D3D11_USAGE_DYNAMIC;
+	buffdesc.ByteWidth		= mesh.ByteWidth();
 	buffdesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	
 	D3D11_SUBRESOURCE_DATA blob{};
 	blob.pSysMem = mesh.vertices.data();
-	
+
 	HRESULT hr = device->CreateBuffer(&buffdesc, &blob, &vbuffer);
 	if (FAILED(hr))
 	{
-		util::ErrorMessageBox("Could not creater error box. Last error: " + LASTERR);
+		util::ErrorMessageBox("Could not create vertex buffer. Last error: " + LASTERR);
 		return false;
 	}
 
-	
-
+	UINT32 pStride = sizeof(dxh::Vertex);
+	UINT32 offset = 0;
+	context->IASetVertexBuffers(0, 1, &vbuffer, &pStride, &offset);
 	return true;
 }
 
-bool DXHandler::SetupIndexBuffer(ID3D11Device*& device, ID3D11Buffer*& indexbuffer, const dxh::Mesh& mesh)
+
+bool DXHandler::CreateInputLayout(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11InputLayout*& layout, const std::string &bytecode)
+{
+
+	D3D11_INPUT_ELEMENT_DESC inputDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",	  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{ "UV", 0, DXGI_FORMAT_R32G32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+	
+	HRESULT hr = device->CreateInputLayout(inputDesc, ARRAYSIZE(inputDesc), bytecode.c_str(), bytecode.length(), &layout); //create input-layout for the assembler stage
+	
+	if (FAILED(hr))
+	{
+		util::ErrorMessageBox("Failed to create input layout. Last error: " + LASTERR);
+		return false;
+	}
+
+	context->IASetInputLayout(layout);
+	return true;
+}
+
+bool DXHandler::CreateIndexBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& bIndex, const dxh::Mesh& mesh)
 {
 	D3D11_BUFFER_DESC ibd{};
-	ibd.Usage = D3D11_USAGE_IMMUTABLE;
-	ibd.ByteWidth = sizeof(UINT) * mesh.indices.size();
-	ibd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	ibd.CPUAccessFlags = 0;
-	ibd.MiscFlags = 0;
-	ibd.StructureByteStride = 0;
+	ibd.Usage				= D3D11_USAGE_IMMUTABLE;
+	ibd.ByteWidth			= sizeof(UINT) * mesh.indices.size();
+	ibd.BindFlags			= D3D11_BIND_INDEX_BUFFER;
+	ibd.CPUAccessFlags		= 0;
+	ibd.MiscFlags			= 0;
+	ibd.StructureByteStride	= 0;
 
 	D3D11_SUBRESOURCE_DATA initData{};
 	initData.pSysMem = mesh.indices.data();
-	HRESULT hr = device->CreateBuffer(&ibd, &initData, &indexbuffer);
+	HRESULT hr = device->CreateBuffer(&ibd, &initData, &bIndex);
 
 	if (FAILED(hr))
 	{
@@ -254,13 +614,84 @@ bool DXHandler::SetupIndexBuffer(ID3D11Device*& device, ID3D11Buffer*& indexbuff
 		return false;
 	}
 
+	context->IASetIndexBuffer(bIndex, DXGI_FORMAT_R32_UINT, 0);
 	return true;
 }
 
-void DXHandler::Render(float dt) 
-{
+void DXHandler::SetViewport(ID3D11DeviceContext *& context,FLOAT width, FLOAT height, FLOAT topleftx, FLOAT toplefty, FLOAT maxdepth, FLOAT mindepth) {
 
-
-	return;
+	D3D11_VIEWPORT vp{ 0 };
+	vp.Width	= width;
+	vp.Height	= height;
+	vp.TopLeftX = topleftx;
+	vp.TopLeftY = toplefty;
+	vp.MaxDepth = maxdepth;
+	vp.MinDepth = mindepth;
+	context->RSSetViewports(1, &vp);
 }
 
+
+//generates a default texture
+void DXHandler::GenerateTexture()
+{
+	cTex.height = 512;
+	cTex.width = 512;
+	cTex.channels = 4;
+	cTex.data.resize(cTex.width * cTex.height * 4);
+
+	for (int h = 0; h < cTex.height; ++h)
+	{
+		for (int w = 0; w < cTex.width; ++w)
+		{
+			unsigned char r = w < cTex.width / 3 ? 255 : 0;
+			unsigned char g = w >= cTex.width / 3 && w <= cTex.width / 1.5f ? 255 : 0;
+			unsigned char b = w > cTex.width / 1.5f ? 255 : 0;
+			unsigned int pos0 = w * cTex.channels + cTex.width * cTex.channels * h;
+			cTex.data[pos0 + 0] = r;
+			cTex.data[pos0 + 1] = g;
+			cTex.data[pos0 + 2] = b;
+			cTex.data[pos0 + 3] = 255;
+		}
+	}
+}
+
+
+//Rotates world matrix at a rate of 2pi(rad)/rot_time(sec)
+void DXHandler::Rotate(float dt, dxh::WVP& wvp) 
+{
+	// one whole lap in radians, time in seconds for a full rotation
+	const float angle = 2 * 3.1415f;
+	//approximately one rotation every 4 seconds
+	const float rot_time = 4.0f;
+	// rotating world matrix around Y axis at a rate
+	wvp.world *= DirectX::XMMatrixRotationY(angle * (dt / rot_time));
+}
+
+void DXHandler::Render(float dt)
+{
+	const FLOAT clearColor[] = { 0.0f, 0.0f, 0.2f, 1.0f };
+	context->ClearRenderTargetView(rendertargetview, clearColor); //Clear backbuffer
+
+	static D3D11_MAPPED_SUBRESOURCE msrc;
+
+	if (!flagged) {
+		context->Map(bVertex, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &msrc);
+		memcpy(msrc.pData, mesh.vertices.data(), sizeof(dxh::Vertex) * mesh.vertices.size());
+		context->Unmap(bVertex, NULL);
+		flagged = true;
+	}
+
+	memcpy(msrc.pData, nullptr, 0); //emptying the subresource before reusing it
+
+	Rotate(dt, wvp);
+
+	context->Map(bMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &msrc); //Write data onto CBuffer
+	memcpy(msrc.pData, &wvp, sizeof(wvp)); // Store data into subresource
+	context->Unmap(bMatrix, 0); 	// Unmap CBuffer
+	//	would have liked to use UpdateSubresource since it looks cleaner, but is apparently slower. 
+	//	source: https://developer.nvidia.com/sites/default/files/akamai/gamedev/files/gdc12/Efficient_Buffer_Management_McDonald.pdf 
+	context->DrawIndexed(mesh.indices.size(), 0, 0);
+
+	swapchain->Present(0, 0);
+	return;
+}

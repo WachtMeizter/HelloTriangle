@@ -93,7 +93,7 @@ namespace dxh
 	using FacePoint = std::vector<size_t>;
 	using Face = std::vector<std::vector<size_t>>;
 
-	//MATHS FORMULAS ========================================================================================================================
+	//FORMULAS ========================================================================================================================
 	inline
 	const float3 cross(const Float3 AB, const Float3 AC)noexcept
 	{

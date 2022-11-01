@@ -38,6 +38,9 @@
     <ClInclude Include="CustomDataTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PipelineHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl">
@@ -46,5 +49,8 @@
     <FxCompile Include="PixelShader.hlsl">
       <Filter>Resource Files</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="readme.txt" />
   </ItemGroup>
 </Project>

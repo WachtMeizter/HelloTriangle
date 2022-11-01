@@ -1,6 +1,7 @@
 #pragma once
 #include "pch.h"
 
+
 #ifndef LASTERR
 #define LASTERR std::to_string(GetLastError())
 #endif // !LASTERR
@@ -12,7 +13,7 @@ namespace util
 		std::chrono::steady_clock::time_point start; //start of life
 		std::chrono::steady_clock::time_point last;	 //last call for delta time
 		std::chrono::duration<float> delta;
-
+		float lastdelta;
 	public:
 		DeltaTimer()
 		{
@@ -26,9 +27,13 @@ namespace util
 			const auto now = std::chrono::high_resolution_clock::now();
 			delta = now - last;
 			last = now;
+			lastdelta = delta.count();
 			return delta.count();
 		}
-
+		const float LastDelta()const
+		{
+			return lastdelta;
+		}
 		void Restart()
 		{
 			start = std::chrono::high_resolution_clock::now();

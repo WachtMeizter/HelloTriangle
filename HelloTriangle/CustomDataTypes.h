@@ -1,10 +1,14 @@
 #pragma once
 #include "pch.h"
 
+#define PI	 3.14159f
+#define RAD 2*PI //2 pi = 1 rad
+
 namespace dxh
 {
 	//Custom variable types
-	
+
+
 	typedef struct Float2
 	{
 		float x;
@@ -44,6 +48,7 @@ namespace dxh
 		bool operator!=(const Float3& comp) { return !Float3::operator==(comp); }
 		Float3 operator+(const Float3& right)const { return Float3(this->x + right.x, this->y + right.y, this->z + right.z); }
 		Float3 operator-(const Float3& right)const { return Float3(this->x - right.x, this->y - right.y, this->z - right.z); }
+		Float3 operator*(const float & right)const { return Float3(x * right, y * right, z * right); }
 		//For output operations
 		friend std::ostream& operator<<(std::ostream& os, const Float3& obj)
 		{
@@ -197,4 +202,45 @@ namespace dxh
 		DirectX::XMMATRIX project;
 	};
 
+
+#define TESTING 1
+	//This doesn't
+#if 1
+	_declspec(align(16)) 
+		struct SingleLight
+	{
+		float4 pos;
+		float4 color;
+		float4 camerapos;
+		float ambient;
+		float3 filler;
+	};
+#endif
+#if 0
+	//This works
+	_declspec(align(16))
+		struct SingleLight
+	{
+		DirectX::XMVECTOR pos;
+		DirectX::XMVECTOR color;
+		DirectX::XMVECTOR camerapos;
+		float ambient;
+	};
+#endif
+	_declspec(align(16))
+	struct SimpleMaterial
+	{
+		float3 spec_color;
+		float  spec_factor;
+	};
+
+	struct ImageData
+	{
+		int width;
+		int height;
+		int channels; //max 4, rgba
+		std::vector<unsigned char> data;
+		ImageData(int _width = 0, int _height = 0, int _channels = 3) : width(_width), height(_height), channels(_channels) {};
+		~ImageData(){};
+	};
 }

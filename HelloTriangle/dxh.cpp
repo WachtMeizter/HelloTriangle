@@ -1,10 +1,7 @@
 #include "pch.h"
 #include "dxh.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb-master\stb_image.h"
-
-
+#include "ImageLoader.h"
 
 DXHandler::DXHandler(HWND handle)
 {
@@ -13,11 +10,20 @@ DXHandler::DXHandler(HWND handle)
 		util::ErrorMessageBox("Failed to set up DirectX.");
 		exit(-1);
 	}
+	
 	if (!SetupPipeline(handle))
 	{
 		util::ErrorMessageBox("Failed to set up pipeline.");
 		exit(-2);
 	}
+
+	//ID3D11Debug* pDebug;
+	//device->QueryInterface(IID_ID3D11DEBUG, (VOID**)(&pDebug));
+	//if (pDebug)
+	//{
+	//	pDebug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+	//	pDebug->Release();
+	//}
 
 	flagged = false;
 }
@@ -35,8 +41,8 @@ DXHandler::~DXHandler()
 	pixelshader->Release();
 	inputlayout->Release();
 	bMatrix->Release();
-	//bMaterial;
-	//bLighting;
+	bMaterial->Release();
+	bLighting->Release();
 	bVertex->Release();
 	bIndex->Release();
 }
@@ -76,9 +82,21 @@ bool DXHandler::SetupPipeline(HWND handle)
 		return false;
 	}
 
-	if (!SetupMatrix(device, context, bMatrix, wvp))
+	if (!SetupMatrixBuffer(device, context, bMatrix, wvp))
 	{
 		util::ErrorMessageBox("Could not set up wvp matrix.");
+		return false;
+	}
+
+	if (!SetupLightBuffer(device, context, bLighting))
+	{
+		util::ErrorMessageBox("could not set up light.");
+		return false;
+	}
+
+	if (!SetupMaterialBuffer(device, context, bMaterial))
+	{
+		util::ErrorMessageBox("Failed to set up material buffer");
 		return false;
 	}
 
@@ -99,17 +117,9 @@ bool DXHandler::SetupPipeline(HWND handle)
 		return false;
 	}
 
-	//Set up Texture
-	//Depth Stencil
 	if (!CreateDepthStencil(device, rc.right - rc.left, rc.bottom - rc.top, dsTexture, dsv, dsState))
 	{
 		util::ErrorMessageBox("Failed to create Depth Stencil");
-		return false;
-	}
-
-	if (!CreateConstantBuffer(device, context, bMatrix)) 
-	{
-		util::ErrorMessageBox("Failed to create matrix constant buffer!");
 		return false;
 	}
 
@@ -125,12 +135,6 @@ bool DXHandler::SetupPipeline(HWND handle)
 	}
 
 	SetTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//Set up wvp matrix const buffer
-
-	//Set up lighting const buffer
-
-	//Set up material const buffer
-
 
 	return true;
 }
@@ -157,8 +161,6 @@ std::string DXHandler::ReadShaderData(std::string filepath){
 	
 	return data;
 }
-
-
 
 bool DXHandler::CreateDeviceAndSwapChain(HWND handle, IDXGISwapChain*& swapchain, ID3D11Device*& device, ID3D11DeviceContext * &context)
 {
@@ -290,29 +292,11 @@ bool DXHandler::CreateRasterizerState(ID3D11Device *& device, ID3D11DeviceContex
 }
 
 
-
-bool DXHandler::SetupMatrix(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, dxh::WVP &wvp)
-{
-	DirectX::XMMATRIX world{}, view{}, projection{};
-
-	wvp.world = DirectX::XMMatrixIdentity();
-	wvp.view = DirectX::XMMatrixTranspose(DirectX::XMMatrixLookAtRH({ 0, 0, -5 }, {0, 0, 0}, {0, 1, 0}));
-	wvp.project = DirectX::XMMatrixPerspectiveFovLH(3.1415f*0.70f, 800/600.0f, 0.1f, 1.0f);
-
-	if (!CreateConstantBuffer(device, context, cBuffer))
-	{
-		return false;
-	}
-	
-	return true;
-};
-
-
-bool DXHandler::CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, const D3D11_SUBRESOURCE_DATA * srd)
+bool DXHandler::CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, UINT byteWidth)
 {
 	D3D11_BUFFER_DESC bd{};
 	bd.Usage = D3D11_USAGE_DYNAMIC;
-	bd.ByteWidth = sizeof(dxh::WVP);
+	bd.ByteWidth = byteWidth;
 	bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	bd.MiscFlags = 0;
@@ -325,11 +309,60 @@ bool DXHandler::CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*
 		return false;
 	}
 
-	context->VSSetConstantBuffers(0, 1, &cBuffer);
+	
 
 	return true;
 }
 
+bool DXHandler::SetupMatrixBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, dxh::WVP &wvp)
+{
+	DirectX::XMMATRIX world{}, view{}, projection{};
+	
+
+	wvp.world	= DirectX::XMMatrixIdentity();
+	wvp.view	= DirectX::XMMatrixTranspose(DirectX::XMMatrixLookAtRH({ camerapos.x, camerapos.y, camerapos.z }, { 0, 0, 0 }, { 0, 1, 0 }));
+	wvp.project = DirectX::XMMatrixTranspose(DirectX::XMMatrixPerspectiveFovRH(0.25*RAD, 800/600.0f, 0.1f, 20.0f));
+
+	if (!CreateConstantBuffer(device, context, cBuffer, sizeof(dxh::WVP)))
+	{
+		return false;
+	}
+	context->VSSetConstantBuffers(0, 1, &cBuffer);
+	return true;
+};
+
+bool DXHandler::SetupLightBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer) 
+{
+
+	if (!CreateConstantBuffer(device, context, cBuffer, sizeof(dxh::SingleLight)))
+	{
+		util::ErrorMessageBox("Failed to create light buffer! Last error " + LASTERR);
+		return false;
+	}
+
+	this->light.pos = { 1.0f, 0.0f, -2.0f, 1.0f};
+	this->light.color = { 1.0f, 1.0f, 1.0f, 1.0f};
+	this->light.camerapos = { camerapos.x, camerapos.y, camerapos.z, 1.0f };
+	this->light.ambient = 0.2f;
+
+	context->PSSetConstantBuffers(0, 1, &cBuffer);
+
+	return true;
+}
+
+bool DXHandler::SetupMaterialBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer) 
+{
+	if (!CreateConstantBuffer(device, context, cBuffer, sizeof(dxh::SimpleMaterial)))
+	{
+		util::ErrorMessageBox("Failed to create constant buffer! Last error " + LASTERR);
+		return false;
+	}
+
+	material.spec_factor = 20.0f;
+	material.spec_color = { 1.0f, 1.0f, 1.0f};
+	context->PSSetConstantBuffers(1, 1, &cBuffer);
+	return true;
+}
 
 
 bool DXHandler::CreateDepthStencil(ID3D11Device*& device, UINT width, UINT height, ID3D11Texture2D *& texture, ID3D11DepthStencilView*& dsview, ID3D11DepthStencilState *& dsstate) 
@@ -352,13 +385,15 @@ bool DXHandler::CreateDepthStencil(ID3D11Device*& device, UINT width, UINT heigh
 	{
 		util::ErrorMessageBox("Failed to create 2D texture for depth stencil. Last error: " + LASTERR);
 		return false;
-	}	
+	}
+
 	hr = device->CreateDepthStencilView(texture, NULL, &dsview);
 	if(FAILED(hr))
 	{
 		util::ErrorMessageBox("Failed to create Depth Stencil View. Last error: " + LASTERR);
 		return false;
 	}
+
 
 	D3D11_DEPTH_STENCIL_DESC dsDesc{};
 	// Depth test parameters
@@ -387,6 +422,7 @@ bool DXHandler::CreateDepthStencil(ID3D11Device*& device, UINT width, UINT heigh
 		return false;
 	}
 	context->OMSetDepthStencilState(dsstate, 0);
+	//context->OMSetRenderTargets(1, &rendertargetview, dsview);
 
 	return true;
 
@@ -395,7 +431,7 @@ bool DXHandler::CreateDepthStencil(ID3D11Device*& device, UINT width, UINT heigh
 bool DXHandler::CreateTexture(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview)
 {
 	//GenerateTexture();
-	LoadTextureFromFile(device, context, texture, shaderresourceview, "smiley.png");
+	LoadImageToTexture(device, context, texture, shaderresourceview, cTex, "annie.png");
 
 
 	D3D11_TEXTURE2D_DESC texDesc{ 0 };
@@ -468,30 +504,11 @@ bool DXHandler::CreateSamplerState(ID3D11Device*& device, ID3D11DeviceContext*& 
 
 
 //Loads an image from a file using the stb_image library and converts it to a usable texture
-bool DXHandler::LoadTextureFromFile(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview, const std::string filepath) 
+bool DXHandler::LoadImageToTexture(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview, dxh::ImageData &target, const std::string filepath)
 {
-	int width, height, channels;
-	
-	unsigned char* img = stbi_load(filepath.c_str(), &width, &height, &channels, 0);
-	if (img == NULL)
-	{
-		util::ErrorMessageBox("could not load image from file \"" + filepath + "\".");
-		return false;
-	}
-	//should be total of the image
-	int n = width * height * channels;
-	std::vector<unsigned char> _img(img, img+n);
+	ImageLoadRaw il;
 
-	cTex.channels = channels;
-	cTex.height = height;
-	cTex.width = width;
-	cTex.data = _img;
-
-
-	//free the data
-	stbi_image_free(img);
-
-	return true;
+	return	il.ImageFromFile(target, filepath.c_str());
 }
 
 //*********************************************************
@@ -502,10 +519,10 @@ bool DXHandler::CreateMesh(ID3D11Device*& device, ID3D11DeviceContext*& context,
 
 	dxh::float3 positions[]
 	{
-		{-0.5, -0.5f, 0.0f}, // top left                  +------+
-		{0.5f, -0.5f, 0.0f}, // top right				  |		 |
 		{-0.5f, 0.5f, 0.0f}, // bottom left				  |		 |
-		{0.5f, 0.5f, 0.0f}   // bottom right			  +------+
+		{0.5f, 0.5f, 0.0f},   // bottom right			  +------+
+		{0.5f, -0.5f, 0.0f}, // top right				  |		 |
+		{-0.5, -0.5f, 0.0f}, // top left                  +------+
 	};
 	//testing cause ít got fuck't
 	//dxh::float3 positions[]
@@ -523,16 +540,16 @@ bool DXHandler::CreateMesh(ID3D11Device*& device, ID3D11DeviceContext*& context,
 	
 	dxh::float2 uv[]
 	{ 
-		{1, 1}, // top left uv
-		{0, 1}, // top right uv
-		{1, 0}, // bottom left uv
-		{0, 0}  // bottom right uv
+		{0, 0}, // top left uv
+		{1, 0}, // top right uv
+		{1, 1},  // bottom right uv
+		{0, 1}, // bottom left uv
 	};
 
 	size_t indices[]
 	{	
-		0, 1, 3, //first triangle
-		0, 3, 2  //second triangle
+		0, 1, 2, //first triangle
+		0, 2, 3  //second triangle
 	};
 	
 
@@ -662,7 +679,7 @@ void DXHandler::Rotate(float dt, dxh::WVP& wvp)
 	// one whole lap in radians, time in seconds for a full rotation
 	const float angle = 2 * 3.1415f;
 	//approximately one rotation every 4 seconds
-	const float rot_time = 4.0f;
+	const float rot_time = 8.0f;
 	// rotating world matrix around Y axis at a rate
 	wvp.world *= DirectX::XMMatrixRotationY(angle * (dt / rot_time));
 }
@@ -684,12 +701,23 @@ void DXHandler::Render(float dt)
 	memcpy(msrc.pData, nullptr, 0); //emptying the subresource before reusing it
 
 	Rotate(dt, wvp);
-
+	
+	//	NOTE: would have liked to use UpdateSubresource since it looks cleaner, but is apparently slower. 
+	//	source: https://developer.nvidia.com/sites/default/files/akamai/gamedev/files/gdc12/Efficient_Buffer_Management_McDonald.pdf 
 	context->Map(bMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &msrc); //Write data onto CBuffer
 	memcpy(msrc.pData, &wvp, sizeof(wvp)); // Store data into subresource
 	context->Unmap(bMatrix, 0); 	// Unmap CBuffer
-	//	would have liked to use UpdateSubresource since it looks cleaner, but is apparently slower. 
-	//	source: https://developer.nvidia.com/sites/default/files/akamai/gamedev/files/gdc12/Efficient_Buffer_Management_McDonald.pdf 
+
+	memcpy(msrc.pData, nullptr, 0); //emptying the subresource before reusing it
+	context->Map(bLighting, 0, D3D11_MAP_WRITE_DISCARD, 0, &msrc);
+	memcpy(msrc.pData, &light, sizeof(light));
+	context->Unmap(bLighting, 0);
+	
+	memcpy(msrc.pData, nullptr, 0); //emptying the subresource before reusing it
+	context->Map(bMaterial, 0, D3D11_MAP_WRITE_DISCARD, 0, &msrc);
+	memcpy(msrc.pData, &material, sizeof(material));
+	context->Unmap(bMaterial, 0);
+
 	context->DrawIndexed(mesh.indices.size(), 0, 0);
 
 	swapchain->Present(0, 0);

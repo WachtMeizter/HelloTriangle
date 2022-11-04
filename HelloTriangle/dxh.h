@@ -11,15 +11,6 @@
 
 #define TEXTUREPATH "D:\repos\HelloTriangle\Resources"
 
-struct CustomTexture
-{
-	int width;
-	int height;
-	int channels; //max 4, rgba
-	std::vector<unsigned char> data;
-	CustomTexture(int _width = 0, int _height = 0, int _channels = 3) : width(_width), height(_height), channels(_channels) {};
-};
-
 class DXHandler
 {
 private:
@@ -44,11 +35,12 @@ private:
 	//Texture
 	bool CreateTexture(ID3D11Device *& device, ID3D11DeviceContext *& context,ID3D11Texture2D *& texture, ID3D11ShaderResourceView *& shaderresourceview);
 	bool CreateSamplerState(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11SamplerState*& samplerstate);
-	bool LoadTextureFromFile(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview, const std::string filepath);
+	bool LoadImageToTexture(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Texture2D*& texture, ID3D11ShaderResourceView*& shaderresourceview, dxh::ImageData &target, const std::string filepath);
 	//Constant buffer
-	bool CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, const D3D11_SUBRESOURCE_DATA* srd = NULL);
-	bool SetupMatrix(ID3D11Device *& device, ID3D11DeviceContext *& context, ID3D11Buffer*& cBuffer, dxh::WVP& wvp);
-	bool SetupLight();
+	bool CreateConstantBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer, UINT byteWidth);
+	bool SetupMatrixBuffer(ID3D11Device *& device, ID3D11DeviceContext *& context, ID3D11Buffer*& cBuffer, dxh::WVP& wvp);
+	bool SetupLightBuffer(ID3D11Device *&device, ID3D11DeviceContext *& context, ID3D11Buffer *& cBuffer);
+	bool SetupMaterialBuffer(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& cBuffer);
 	//Misc
 	bool CreateMesh(ID3D11Device*& device, ID3D11DeviceContext*& context, ID3D11Buffer*& bVertex, ID3D11Buffer*& indexbuffer);
 	std::string ReadShaderData(std::string filepath);
@@ -79,8 +71,13 @@ private:
 	ID3D11SamplerState* gSamplerState;
 	//Misc
 	dxh::WVP wvp;
+	dxh::SingleLight light;
+	dxh::SingleLight diffuse;
+	dxh::SingleLight specular;
+	dxh::SimpleMaterial material;
 	dxh::Mesh mesh;
-	CustomTexture cTex;
+	dxh::ImageData cTex;
+	const dxh::float3 camerapos = { 0.0f, 0.0, -1.0f };
 public:
 
 	DXHandler(HWND handle);

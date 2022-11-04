@@ -4,7 +4,7 @@
 
 // The main window class name.
 static TCHAR szWindowClass[] = _T("Hello Triangle");
-// The string that appears in the application's title bar.
+// The string that appears in the applihacation's title bar.
 static TCHAR szTitle[] = _T("Hello Triangle");
 
 // Stored instance handle for use in Win32 API calls such as FindResource

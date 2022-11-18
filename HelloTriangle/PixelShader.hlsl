@@ -3,18 +3,19 @@ Texture2D testTexture :register(t0);
 SamplerState testSampler;
 
 //CONSTANT BUFFER OBJECTS
-cbuffer SIMPLELIGHT : register(b0)
+cbuffer LIGHT : register(b0)
 {
-	float4	light_pos : POSITION;
-	float4	light_color : COLOR;
-	float4	camera_pos : POSITION;
-	float	light_ambient; 
+	float4	light_pos;
+	float4	light_color;
+	float3	camera_pos;
 };
 
-cbuffer SIMPLEMATERIAL : register(b1)
+cbuffer MATERIAL : register(b1)
 {
-	float3 material_specular_color : COLOR;
-	float  material_specular_factor;
+	float4 m_ambi; //ambient light color
+	float4 m_diff; //diffuse light color
+	float4 m_spec; //specular light color
+	float  m_sfac; //specular factor
 }
 
 //VERTEX SHADER OUTPUT
@@ -30,35 +31,26 @@ float4 main(PS_IN input) : SV_TARGET
 {
 
 	// INITIALISE VALUES
-	float3 final_pixel = (float3)0; //return value, initialized to 0, 0, 0, 0
+	float4 final_pixel = (float4)1; //return value, initialized to 0, 0, 0, 0
 	// SAMPLE TEXTURE
 	float4 tex = float4(testTexture.Sample(testSampler, input.uv).xyz, 1.0f);
+	
 	// AMBIENT
-	float3 ambient_lighting = light_color.xyz * light_ambient;
+	float3 ambient_lighting = light_color.xyz * m_ambi.xyz;
 	
 	// DIFFUSE CALCULATIONS
-
 	float3 normal = normalize(input.normal);
-	float3 lightdir = normalize(input.pos - light_pos.xyz); //directional vector from light to surface
-	float  diffuse_factor = max(dot(normal, lightdir), 0);
-	float3 diffuse_lighting = light_color.xyz * diffuse_factor;
+	float3 light_dir = normalize(input.pos - light_pos.xyz); //directional vector from light to surface
+	float  diffuse_factor = max(dot(normal, light_dir), 0);
+	float3 diffuse_lighting = light_color.xyz * diffuse_factor * m_diff.xyz;
 	
 	// SPECULAR CALCULATIONS
-	//float  specular_factor	= material_specular_factor;
-	//float3 specular_light	= material_specular_color.xyz;
-	//float3 reflection = -(2 * normalize(input.normal - viewdir.xyz));
-	// BWAH
-	/*float3 specular_color = material_specular_color;
-	float3 halfway = normalize(normalize(camera_pos.xyz - input.pos) + lightdir);
-	float3 specular_lighting = specular_color * (light_color.xyz * pow((normal * halfway), material_specular_factor));*/
-	
-	float3 viewdir = normalize(camera_pos.xyz - input.pos); //Directional vector from camera to point on surface
-	float3 reflection = reflect(lightdir, -normal);
-	float spec = pow(max(dot(viewdir, reflection), 0.0), material_specular_factor);
-	float3 specular_lighting = spec * light_color;
+	float3 view_dir = normalize(camera_pos - input.pos);
+	float3 reflection = reflect(light_dir, normal);
+	float  spec = pow(max(dot(view_dir, reflection), 0.0), m_sfac);
+	float3 specular_lighting = light_color.xyz * spec * m_spec.xyz;
 
 	// APPLY COLORS
-	final_pixel = (ambient_lighting +diffuse_lighting + specular_lighting) * tex.xyz;
-	//final_pixel = material_specular_color;
-	return float4(final_pixel, 1.0f);
+	final_pixel.xyz = (ambient_lighting + diffuse_lighting + specular_lighting) * tex.xyz;
+	return final_pixel;
 }

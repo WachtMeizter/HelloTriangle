@@ -25,11 +25,10 @@ VS_OUT main(VS_IN input)
 {
 	VS_OUT output = (VS_OUT)0;
 
-	
 	matrix transform = mul(world, mul(view, project));
 
-	output.vpos = mul(float4(input.pos, 1.0f), transform);
-	output.pos = mul(input.pos, world);
+	output.vpos   = mul(float4(input.pos, 1.0f), transform);
+	output.pos	  = mul(input.pos, world);
 	output.normal = mul(input.normal, world);
 	output.uv = input.uv;
 	return output;

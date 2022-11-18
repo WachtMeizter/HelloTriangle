@@ -7,8 +7,6 @@
 namespace dxh
 {
 	//Custom variable types
-
-
 	typedef struct Float2
 	{
 		float x;
@@ -94,106 +92,58 @@ namespace dxh
 		bool operator==(const Vertex& comp) { return (this->pos == comp.pos && pos == comp.pos && uv == comp.uv); }
 		bool operator!=(const Vertex& comp) { return !(this == &comp); }
 	}vertex;
-
-	using FacePoint = std::vector<size_t>;
-	using Face = std::vector<std::vector<size_t>>;
-
-	//FORMULAS ========================================================================================================================
+	//VECTOR FORMULAS ====================================================================================================================
 	inline
-	const float3 cross(const Float3 AB, const Float3 AC)noexcept
+	const float lengthf(const Float3 vec)noexcept
 	{
-		float3 normal{};
-		normal.x = AB.y * AC.z - AB.z * AC.y;
-		normal.y = AB.x * AC.z - AB.z * AC.x;
-		normal.z = AB.x * AC.y - AB.y * AC.x;
-		return normal;
+		return sqrtf(
+			powf(vec.x < 0 ? -vec.x : vec.x, 2) 
+			+ powf(vec.y < 0 ? -vec.x : vec.x, 2) 
+			+ powf(vec.z < 0 ? -vec.x : vec.x, 2));
+	}
+
+	inline
+	const Float3 cross(const Float3 _AB, const Float3 _AC)noexcept
+	{
+		return Float3(_AB.y * _AC.z - _AB.z * _AC.y, 
+					  _AB.x * _AC.z - _AB.z * _AC.x, 
+					  _AB.x * _AC.y - _AB.y * _AC.x);
+	}
+
+	inline
+	const float dot(const Float3 _AB, const Float3 _AC)noexcept 
+	{ 
+		//INCOMPLETE
+		return lengthf(_AB) * lengthf(_AC);
 	}
 	//MESH ==============================================================================================================================
 	class Mesh
 	{
-	private:
-		//class variables
-		void AssembleVertices() {
-			int i = 0;
-			for (const auto& a : faces)
-			{
-				for (const auto& b : a)
-				{
-					dxh::Vertex tempvtx;
-					//position 0 in a face vector is position, check if it was read
-					if (b[0] > 0)
-					{
-						tempvtx.pos = vpos[b[0] - 1];
-					}
-					//position 1 is uv coordinate
-					if (b[1] > 0)
-					{
-						tempvtx.uv = vt[b[1] - 1];
-					}
-					//position 2 is normal 
-					if (b[2] > 0)
-					{
-						tempvtx.normal = vnorm[b[2] - 1];
-					}
-					vertices.push_back(tempvtx);
-					indices.push_back(i++);
-				}
-			}
-		}
 	public:
 		std::string name;
 		std::vector<dxh::Vertex> vertices;
 		std::vector<size_t> indices;
-		std::vector<Float3> vpos;
-		std::vector<Float2> vt;
-		std::vector<Float3> vnorm;
-		std::vector<Face> faces;
+		Mesh() { name = "unnamed"; }
+		Mesh(std::vector<dxh::Vertex> _vtxs, std::vector<size_t> _indices, std::string _name = "unnamed") 
+			: vertices(_vtxs), indices(_indices), name(_name) {}
 
-		Mesh() { vpos.clear(); vt.clear(); vnorm.clear(); faces.clear(); name = "unnamed"; }
-		Mesh(std::vector<dxh::Float3> _vpos, std::vector<Float3> _vnorm, std::vector<Float2> _vt, std::vector<dxh::Face> _faces)
-			: vpos(_vpos), vt(_vt), vnorm(_vnorm), faces(_faces) {}
-		Mesh(std::vector<dxh::Vertex> _vtxs, std::vector<size_t> _indices, std::string _name = "unnamed") :vertices(_vtxs), indices(_indices), name(_name) {}
-
-		Mesh(const Mesh& copy) :name(copy.name), vertices(copy.vertices), faces(copy.faces) { }
+		Mesh(const Mesh& copy) :name(copy.name), vertices(copy.vertices), indices(copy.indices) { }
 		~Mesh() {}
 		const std::vector<dxh::Vertex>& GetVertices() {
-			//check if vertices have been read
-			if (!(vertices.size() > 0))
-				AssembleVertices();
 			return vertices;
 		}
 		Mesh& operator=(const Mesh& right) {
 			if (&right != this) {
 				name = right.name;
 				vertices = right.vertices;
-				faces = right.faces;
+				indices = right.indices;
 			}
 			return *this;
 		}
-		const std::size_t ByteWidth() const { return sizeof(this->vertices.front()) * this->vertices.size(); } //returns the size of the vertex array in bytes for 
+		const std::size_t ByteWidth() const { return sizeof(Vertex) * this->vertices.size(); } //returns the size of the vertex array in bytes for 
 	};
 
 	//CONSTANT BUFFER OBJECT TYPES============================================================================================================
-	struct World : public DirectX::XMFLOAT4X4 //for world-view-projection matrix
-	{
-		DirectX::XMFLOAT4X4 matrix;
-	};
-
-	struct Camera : public DirectX::XMFLOAT4X3 //right-oriented camera //stores a 4x3 view matrix
-	{
-		DirectX::XMFLOAT4 pos;
-		DirectX::XMFLOAT4 lookat;
-		DirectX::XMFLOAT4 up;
-	};
-
-	struct Projection // projection, stores data for WVP matrix
-	{
-		float fov;
-		float asratio;
-		float nearz;
-		float farz;
-	};
-
 	_declspec(align(16))
 		struct WVP
 	{
@@ -202,37 +152,28 @@ namespace dxh
 		DirectX::XMMATRIX project;
 	};
 
-
-#define TESTING 1
-	//This doesn't
-#if 1
 	_declspec(align(16)) 
-		struct SingleLight
+		struct SimpleLight
 	{
 		float4 pos;
 		float4 color;
-		float4 camerapos;
-		float ambient;
+		float3 camerapos;
+		float filler;
+		//float intensity;
+		SimpleLight() { filler = 0.0f; }
+	};
+
+	_declspec(align(16))
+		struct SimpleMaterial
+	{
+		float4 ambi_col;
+		float4 diff_col;
+		float4 spec_col;
+		float spec_factor;
 		float3 filler;
+		SimpleMaterial() :spec_factor(0.0f) {}
 	};
-#endif
-#if 0
-	//This works
-	_declspec(align(16))
-		struct SingleLight
-	{
-		DirectX::XMVECTOR pos;
-		DirectX::XMVECTOR color;
-		DirectX::XMVECTOR camerapos;
-		float ambient;
-	};
-#endif
-	_declspec(align(16))
-	struct SimpleMaterial
-	{
-		float3 spec_color;
-		float  spec_factor;
-	};
+	
 
 	struct ImageData
 	{

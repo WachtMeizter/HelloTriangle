@@ -27,7 +27,7 @@ bool ImageLoadRaw::ImageFromFile(dxh::ImageData &target, const char* filepath)
 {
 	int width, height, channels;
 
-	//stbi_set_flip_vertically_on_load(1);
+	stbi_set_flip_vertically_on_load(1);
 	unsigned char* img = stbi_load(filepath, &width, &height, &channels, 0);
 	if (img == NULL)
 	{

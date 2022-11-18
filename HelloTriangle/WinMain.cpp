@@ -1,34 +1,27 @@
-
+//Sebastian Lorensson 2022-11-18
 #include "pch.h"
 #include "dxh.h"
-
-// The main window class name.
-static TCHAR szWindowClass[] = _T("Hello Triangle");
-// The string that appears in the applihacation's title bar.
-static TCHAR szTitle[] = _T("Hello Triangle");
-
-// Stored instance handle for use in Win32 API calls such as FindResource
 
 HWND SetupWindow(int height, int width, int x, int y, HINSTANCE hInstance);
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
-
     static HWND handle = SetupWindow(800, 600, 560, 200, hInstance);
 
     if (!handle)
     {
-        util::ErrorMessageBox("Call to create window failed. Last err: " + LASTERR);
-        return 1;
+        util::ErrorMessageBox("Call to setup window failed. Last err: " + LASTERR);
+        return EXIT_FAILURE;
     }
+
     DXHandler dxh(handle);
-    ShowWindow(handle, nCmdShow);
-     // Main message loop:
-    MSG msg{};
-    //Timer for rendering operations
+
     util::DeltaTimer dt;
 
+    MSG msg{};
+
+    ShowWindow(handle, nCmdShow);
 
     while (WM_QUIT != msg.message)
     {
@@ -39,8 +32,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         }
         else 
         {
-            UpdateWindow(handle);
-            //do directx stuff
             dxh.Render(dt.Delta());
         }
     }
@@ -50,6 +41,8 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 
 HWND SetupWindow(int width, int height, int x, int y, HINSTANCE hInstance)
 {
+    TCHAR szWindowClass[] = _T("Hello Triangle");
+    TCHAR szTitle[] = _T("Hello Triangle");
 
     WNDCLASSEX wcex{ 0 };
 
@@ -68,8 +61,8 @@ HWND SetupWindow(int width, int height, int x, int y, HINSTANCE hInstance)
 
     if (!RegisterClassEx(&wcex))
     {
-        util::ErrorMessageBox("Could not register WNDCLASSEX. Last error: " + LASTERR);
-        exit(-100);
+        util::ErrorMessageBox("Could not register WNDCLASSEX.");
+        exit(-1);
     }
 
     HWND hWnd = CreateWindowEx(

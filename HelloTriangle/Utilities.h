@@ -2,12 +2,9 @@
 #include "pch.h"
 
 
-#ifndef LASTERR
-#define LASTERR std::to_string(GetLastError())
-#endif // !LASTERR
-
 namespace util
 {
+	//USED
 	class DeltaTimer {
 	private:
 		std::chrono::steady_clock::time_point start; //start of life
@@ -15,7 +12,7 @@ namespace util
 		std::chrono::duration<float> delta;
 		float lastdelta;
 	public:
-		DeltaTimer()
+		DeltaTimer() : lastdelta(0.0f)
 		{
 			this->Restart();
 		}
@@ -24,11 +21,11 @@ namespace util
 		}
 		const float Delta()
 		{
-			const auto now = std::chrono::high_resolution_clock::now();
+			const std::chrono::steady_clock::time_point now = std::chrono::high_resolution_clock::now();
 			delta = now - last;
 			last = now;
 			lastdelta = delta.count();
-			return delta.count();
+			return lastdelta;
 		}
 		const float LastDelta()const
 		{
@@ -41,15 +38,23 @@ namespace util
 		}
 		const float GetElapsed()const
 		{
-			auto now = std::chrono::high_resolution_clock::now();
+			std::chrono::steady_clock::time_point now = std::chrono::high_resolution_clock::now();
 			std::chrono::duration<float> elapsed = now - start;
 			return elapsed.count();
 		}
 	};
 
+
+#if  defined(_WIN32) || defined(_WIN64)
+
+#ifndef LASTERR
+#define LASTERR std::string(" Last error: " + std::to_string(GetLastError()))
+#endif // !LASTERR
+
 	inline
 		void ErrorMessageBox(std::string message, std::string boxname = "error")
 	{
+		message.append(LASTERR);
 		std::wstring msg, name;
 		msg.assign(message.begin(), message.end());
 		name.assign(boxname.begin(), boxname.end());
@@ -58,7 +63,8 @@ namespace util
 			name.c_str(),
 			NULL);
 	}
-
+#endif
+#if 0
 	inline
 		const std::string ReadFileAsString(const char* filepath) //puts every line in the strign
 	{
@@ -315,5 +321,5 @@ namespace util
 		}
 		return u;
 	}
-
+#endif
 } // end of namespace

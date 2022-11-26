@@ -157,7 +157,7 @@ namespace dxh
 	{
 		float4 pos;
 		float4 color;
-		float3 camerapos;
+		float3 viewpos;
 		float filler;
 		//float intensity;
 		SimpleLight() { filler = 0.0f; }
@@ -181,7 +181,7 @@ namespace dxh
 		int height;
 		int channels; //max 4, rgba
 		std::vector<unsigned char> data;
-		ImageData(int _width = 0, int _height = 0, int _channels = 3) : width(_width), height(_height), channels(_channels) {};
+		ImageData(int _width = 0, int _height = 0, int _channels = 4) : width(_width), height(_height), channels(_channels) {};
 		~ImageData(){};
 	};
 }

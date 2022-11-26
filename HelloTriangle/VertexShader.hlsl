@@ -9,16 +9,16 @@ cbuffer MATRIX : register(b0)
 struct VS_IN 
 {
 	float3 pos : POSITION;
-	float3 normal : NORMAL;
 	float2 uv : UV;
+	float3 normal : NORMAL;
 };
 
 struct VS_OUT
 {
 	float4 vpos : SV_POSITION;
 	float3 pos : POSITION;
-	float3 normal : NORMAL;
 	float2 uv : UV;
+	float3 normal : NORMAL;
 };
 
 VS_OUT main(VS_IN input)

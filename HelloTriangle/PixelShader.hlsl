@@ -7,7 +7,7 @@ cbuffer LIGHT : register(b0)
 {
 	float4	light_pos;
 	float4	light_color;
-	float3	camera_pos;
+	float3	view_pos;
 };
 
 cbuffer MATERIAL : register(b1)
@@ -23,8 +23,8 @@ struct PS_IN
 {
 	float4 vpos : SV_POSITION;
 	float3 pos : POSITION;
-	float3 normal : NORMAL;
 	float2 uv : UV;
+	float3 normal : NORMAL;
 };
 
 float4 main(PS_IN input) : SV_TARGET
@@ -45,8 +45,8 @@ float4 main(PS_IN input) : SV_TARGET
 	float3 diffuse_lighting = light_color.xyz * diffuse_factor * m_diff.xyz;
 	
 	// SPECULAR CALCULATIONS
-	float3 view_dir = normalize(camera_pos - input.pos);
-	float3 reflection = reflect(light_dir, normal);
+	float3 view_dir = normalize(view_pos - input.pos);
+	float3 reflection = reflect(light_dir, normal); // v = i - 2 * n * dot(i n), halfway vector
 	float  spec = pow(max(dot(view_dir, reflection), 0.0), m_sfac);
 	float3 specular_lighting = light_color.xyz * spec * m_spec.xyz;
 

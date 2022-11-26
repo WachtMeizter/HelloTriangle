@@ -25,24 +25,28 @@ ImageLoadRaw::ImageLoadRaw(dxh::ImageData& target, const char* filepath)
 inline
 bool ImageLoadRaw::ImageFromFile(dxh::ImageData &target, const char* filepath)
 {
-	int width, height, channels;
+	int width, height, channels = 4;
 
-	stbi_set_flip_vertically_on_load(1);
-	unsigned char* img = stbi_load(filepath, &width, &height, &channels, 0);
+	unsigned char* img = stbi_load(filepath, &width, &height, &channels, 4);
 	if (img == NULL)
 	{
 		util::ErrorMessageBox("could not load image from file \"" + std::string(filepath) + "\".");
+		if (img) stbi_image_free(img);
 		return false;
 	}
+
+	//forcing 4 channels
+	channels = 4;
 	//n would be the total size of the image
 	std::vector<unsigned char> temp(img, img + (width * height * channels)); 
 
-	target.channels = channels;
+	target.channels = channels; //force 4 channels
 	target.height = height;
 	target.width = width;
 	target.data = temp;
 
 	//free the data
 	stbi_image_free(img); 
+
 	return true;
 }

@@ -2,17 +2,11 @@
 //external libraries
 #include <Windows.h>
 #include <d3d11.h>
-#include <d3dcompiler.h>
+//#include <d3dcompiler.h> //don't need 'cause compiling from byte code, keep for posterity
 #include <DirectXMath.h>
 #include <fstream>
-#include <iostream>
 #include <string>
 #include <sstream>
 #include <vector>
 #include <chrono>
-#include <memory>
-#include <utility>
-#include <unordered_map>
 #include <tchar.h>
-
-

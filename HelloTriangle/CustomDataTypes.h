@@ -16,7 +16,6 @@ namespace dxh
 		Float2& operator=(Float2&& param)noexcept { x = param.x, y = param.y; return *this; }
 		Float2& operator=(const Float2& param) { x = param.x, y = param.y; return *this; }
 		Float2(const float& _x, const float& _y)noexcept { x = _x, y = _y; }
-		//Float2(const float* pArray)noexcept { if (!(pArray == nullptr)) { x = pArray[0], y = pArray[1]; } else { Float2(0.0f, 0.0f); } }
 		constexpr float operator[](const size_t _i) { if (_i == 0) return x; return y; }
 		bool operator==(const Float2& comp) { return (this->x == comp.x && this->y == comp.y); }
 		bool operator!=(const Float2& comp) { return !Float2::operator==(comp); }
@@ -39,7 +38,6 @@ namespace dxh
 		Float3& operator=(Float3&& param)noexcept { x = param.x, y = param.y, z = param.z; return *this; }
 		Float3& operator=(const Float3& param) { x = param.x, y = param.y, z = param.z; return *this; }
 		Float3(float _x, float _y, float _z)noexcept { x = _x, y = _y, z = _z; }
-		//Float3(const float *pArray)noexcept { if (pArray != NULL) { x = pArray[0], y = pArray[1], z = pArray[2]; } }
 		const float& operator[](const size_t _i)const { if (_i == 0) return x; if (_i == 1)return y; return z; }
 		constexpr float operator[](const size_t _i) { if (_i == 0) return x; if (_i == 1)return y; return z; }
 		bool operator==(const Float3& comp) { return (this->x == comp.x && this->y == comp.y && this->z == comp.z); }
@@ -62,14 +60,11 @@ namespace dxh
 		float y;
 		float z;
 		float w;
-
 		Float4()noexcept : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
 		Float4(const Float4& param) : x(param.x), y(param.y), z(param.z), w(param.w) { }
 		Float4& operator=(Float4& param)noexcept { if (!(&param != this)) { x = param.x, y = param.y, z = param.z, w = param.w; } return *this; }
 		Float4& operator=(Float4&& param)noexcept { x = std::move(param.x), y = std::move(param.y), z = std::move(param.z), w = std::move(param.w); return *this; }
 		Float4(float _x, float _y, float _z, float _w)noexcept :x(_x), y(_y), z(_z), w(_w) { }
-		//Float4(const float *pArray) noexcept { if (!(pArray == nullptr)) { x = pArray[0], y = pArray[1], z = pArray[2], w = pArray[3]; } }
-
 		constexpr float operator[](const size_t _i) const { if (_i == 0) return x; if (_i == 1)return y; if (_i == 2) return z; return w; }
 		bool operator==(const Float4& comp)const { return (this->x == comp.x && this->y == comp.y && this->z == comp.z && this->w == comp.w); }
 		bool operator!=(const Float4& comp)const { return !(Float4::operator==(comp)); }
@@ -83,38 +78,22 @@ namespace dxh
 	typedef struct Vertex
 	{
 		float3 pos;
-		float3 normal;
 		float2 uv;
-		Vertex()noexcept : pos(0.0f, 0.0f, 0.0f), normal(0.0f, 0.0f, 0.0f), uv(0.0f, 0.0f) { }
+		float3 normal;
+		Vertex()noexcept : pos(0.0f, 0.0f, 0.0f), uv(0.0f, 0.0f), normal(0.0f, 0.0f, 0.0f) { }
 		Vertex(const float3& _pos, const float3& _normal, const float2& _uv)
-			: pos(_pos), normal(_normal), uv(_uv) {}
+			: pos(_pos), uv(_uv), normal(_normal) {}
 		Vertex& operator=(const Vertex& copy) { if (this != &copy) { pos = copy.pos; normal = copy.normal; uv = copy.uv; } return *this; }
 		bool operator==(const Vertex& comp) { return (this->pos == comp.pos && pos == comp.pos && uv == comp.uv); }
 		bool operator!=(const Vertex& comp) { return !(this == &comp); }
 	}vertex;
 	//VECTOR FORMULAS ====================================================================================================================
 	inline
-	const float lengthf(const Float3 vec)noexcept
-	{
-		return sqrtf(
-			powf(vec.x < 0 ? -vec.x : vec.x, 2) 
-			+ powf(vec.y < 0 ? -vec.x : vec.x, 2) 
-			+ powf(vec.z < 0 ? -vec.x : vec.x, 2));
-	}
-
-	inline
 	const Float3 cross(const Float3 _AB, const Float3 _AC)noexcept
 	{
 		return Float3(_AB.y * _AC.z - _AB.z * _AC.y, 
 					  _AB.x * _AC.z - _AB.z * _AC.x, 
 					  _AB.x * _AC.y - _AB.y * _AC.x);
-	}
-
-	inline
-	const float dot(const Float3 _AB, const Float3 _AC)noexcept 
-	{ 
-		//INCOMPLETE
-		return lengthf(_AB) * lengthf(_AC);
 	}
 	//MESH ==============================================================================================================================
 	class Mesh
@@ -147,9 +126,9 @@ namespace dxh
 	_declspec(align(16))
 		struct WVP
 	{
-		DirectX::XMMATRIX world;
-		DirectX::XMMATRIX view;
-		DirectX::XMMATRIX project;
+		DirectX::XMFLOAT4X4 world;
+		DirectX::XMFLOAT4X4 view;
+		DirectX::XMFLOAT4X4 project;
 	};
 
 	_declspec(align(16)) 
@@ -173,8 +152,7 @@ namespace dxh
 		float3 filler;
 		SimpleMaterial() :spec_factor(0.0f) {}
 	};
-	
-
+	//For loading with stbi_load
 	struct ImageData
 	{
 		int width;

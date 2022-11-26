@@ -33,7 +33,7 @@ float4 main(PS_IN input) : SV_TARGET
 	// INITIALISE VALUES
 	float4 final_pixel = (float4)1; //return value, initialized to 0, 0, 0, 0
 	// SAMPLE TEXTURE
-	float4 tex = float4(testTexture.Sample(testSampler, input.uv).xyz, 1.0f);
+	float3 tex = testTexture.Sample(testSampler, input.uv).xyz;
 	
 	// AMBIENT
 	float3 ambient_lighting = light_color.xyz * m_ambi.xyz;
@@ -41,16 +41,16 @@ float4 main(PS_IN input) : SV_TARGET
 	// DIFFUSE CALCULATIONS
 	float3 normal = normalize(input.normal);
 	float3 light_dir = normalize(input.pos - light_pos.xyz); //directional vector from light to surface
-	float  diffuse_factor = max(dot(normal, light_dir), 0);
-	float3 diffuse_lighting = light_color.xyz * diffuse_factor * m_diff.xyz;
+	float  diffuse_factor = max(dot(normal, -light_dir), 0); //cosine of angle between the light and surface normal
+	float3 diffuse_lighting = light_color.xyz * diffuse_factor * m_diff.xyz; 
 	
 	// SPECULAR CALCULATIONS
 	float3 view_dir = normalize(camera_pos - input.pos);
-	float3 reflection = reflect(light_dir, normal);
+	float3 reflection = reflect(light_dir, normal); // v = i - 2 * n * dot(i n) .
 	float  spec = pow(max(dot(view_dir, reflection), 0.0), m_sfac);
 	float3 specular_lighting = light_color.xyz * spec * m_spec.xyz;
 
 	// APPLY COLORS
-	final_pixel.xyz = (ambient_lighting + diffuse_lighting + specular_lighting) * tex.xyz;
+	final_pixel.xyz = (ambient_lighting + diffuse_lighting) * tex.xyz + specular_lighting;
 	return final_pixel;
 }

@@ -1,9 +1,4 @@
-checklista
-*quad
-*viewport
-*vertex buffer
-*matrix world view projection
-*textur
-*ljus
-*phong shading
-*rotation
+PBR ljussättning
+Bygg en ny världsmatris varje frame / ordning SRT (skala rotation translation)
+dld@bth.se
+inga läckor

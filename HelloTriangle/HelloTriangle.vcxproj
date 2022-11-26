@@ -164,7 +164,6 @@
     <ClInclude Include="dxh.h" />
     <ClInclude Include="ImageLoader.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="PipelineHandler.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Utilities.h" />
   </ItemGroup>

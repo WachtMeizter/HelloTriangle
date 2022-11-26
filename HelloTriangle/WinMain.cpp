@@ -7,8 +7,10 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nCmdShow)
 {
-    static HWND handle = SetupWindow(800, 600, 560, 200, hInstance);
+    // Check for leaks
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
+    HWND handle = SetupWindow(800, 600, 560, 200, hInstance);
     if (!handle)
     {
         util::ErrorMessageBox("Call to setup window failed. Last err: " + LASTERR);
@@ -16,12 +18,12 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     DXHandler dxh(handle);
-
-    util::DeltaTimer dt;
-
+    util::DeltaTimer dt; //timing
     MSG msg{};
 
+
     ShowWindow(handle, nCmdShow);
+
 
     while (WM_QUIT != msg.message)
     {
@@ -35,6 +37,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
             dxh.Render(dt.Delta());
         }
     }
+
 
     return static_cast<int>(msg.wParam);
 }

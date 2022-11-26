@@ -4,7 +4,7 @@
 #include "Utilities.h"
 #include "CustomDataTypes.h"
 
-#define TEXTUREPATH "D:\repos\HelloTriangle\Resources"
+namespace dx = DirectX; //efficiency
 
 class DXHandler
 {
@@ -35,13 +35,12 @@ private:
 	// MISC
 	bool CreateBuffers();
 	void GenerateMesh(dxh::Mesh& mesh);
-	void GenerateTexture(dxh::ImageData& id); //generates a default texture if one could not be loaded
+	void GenerateTexture(dxh::ImageData& id); //generates a default texture, not used
 	void MapBuffer(ID3D11Buffer*& cBuffer, const void* src, size_t size);
 	std::string ReadShaderData(std::string filepath);
-	void Rotate(float dt, DirectX::XMMATRIX& world);
+	void Rotate(float dt);
 	void SetAll();
 	void SetupBufferObjects(RECT& rc);
-
 private:
 	// VARIABLES
 	// Interface
@@ -64,14 +63,13 @@ private:
 	ID3D11Buffer* bMatrix;
 	ID3D11Buffer* bLight;
 	// Texture
-	ID3D11ShaderResourceView* gTextureView;
-	ID3D11SamplerState* gSamplerState;
+	ID3D11ShaderResourceView* textureView;
+	ID3D11SamplerState* samplerState;
 	// Misc, variables and what not
 	dxh::WVP wvp;					//world, view projection matrices
 	dxh::SimpleLight light;
 	dxh::SimpleMaterial material;
 	dxh::Mesh mesh;
-	
 public:
 	DXHandler(HWND handle);
 	~DXHandler();

@@ -56,7 +56,4 @@
       <Filter>Resource Files</Filter>
     </FxCompile>
   </ItemGroup>
-  <ItemGroup>
-    <Text Include="readme.txt" />
-  </ItemGroup>
 </Project>
